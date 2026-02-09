@@ -1,0 +1,150 @@
+<section class="gallery">
+  <div id="gallery" style="visibility: hidden; height: 1px; overflow: hidden">
+    {{ $images := slice }}
+    {{ $videos := slice }}
+
+    {{/* Process local image resources */}}
+    {{ range $image := where (.Resources.ByType "image") "Params.hidden" "ne" true }}
+      {{ $title := "" }}
+      {{ $date := "" }}
+      {{ with $image.Exif }}
+        {{ $date = .Date }}
+        {{ with .Tags.ImageDescription }}
+          {{/* Title from EXIF ImageDescription */}}
+          {{ $title = . }}
+        {{ end }}
+      {{ end }}
+      {{ if ne $image.Title $image.Name }}
+        {{/* Title from front matter */}}
+        {{ $title = $image.Title }}
+      {{ end }}
+      {{ if $image.Params.Date }}
+        {{/* Date from front matter */}}
+        {{ $date = time $image.Params.Date }}
+      {{ end }}
+      {{ $images = $images | append (dict
+        "Name" $image.Name
+        "Title" $title
+        "Date" $date
+        "image" $image
+        "Params" $image.Params
+        "Type" "image"
+        "IsLocal" true
+        )
+      }}
+    {{ end }}
+
+    {{/* Process external images from front matter */}}
+    {{ range .Params.images }}
+      {{ $images = $images | append (dict
+        "Name" (.title | default .url)
+        "Title" (.title | default "Image")
+        "URL" .url
+        "Date" (time (.date | default now))
+        "Type" "image"
+        "IsLocal" false
+        "Params" .
+        )
+      }}
+    {{ end }}
+
+    {{/* Process videos from front matter */}}
+    {{ range .Params.videos }}
+      {{ $videos = $videos | append (dict
+        "Name" (.title | default .url)
+        "Title" (.title | default "Video")
+        "URL" .url
+        "Date" (time (.date | default now))
+        "Type" "video"
+        "Params" .
+        )
+      }}
+    {{ end }}
+
+    {{/* Combine images and videos */}}
+    {{ $allItems := $images }}
+    {{ range $videos }}
+      {{ $allItems = $allItems | append . }}
+    {{ end }}
+    {{ $publishResources := default true .Params.build.publishResources }}
+    {{ range sort $allItems (.Params.sort_by | default "Name") (.Params.sort_order | default "asc") }}
+      {{ if eq .Type "image" }}
+        {{ if .IsLocal }}
+          {{/* Render local image item */}}
+          {{ $image := .image }}
+          {{ $thumbnail := $image.Filter (slice images.AutoOrient (images.Process "fit 600x600")) }}
+          {{ $full := $image.Filter (slice images.AutoOrient (images.Process "fit 1600x1600")) }}
+          {{ $color := index $thumbnail.Colors 0 | default "transparent" }}
+          <a class="gallery-item" href="{{ $full.RelPermalink }}" data-target="{{ $image.Name | urlize }}" title="{{ .Title }}" itemscope itemtype="https://schema.org/ImageObject" style="aspect-ratio: {{ $thumbnail.Width }} / {{ $thumbnail.Height }}">
+            <figure style="background-color: {{ $color }}; aspect-ratio: {{ $thumbnail.Width }} / {{ $thumbnail.Height }}">
+              <img class="lazyload" width="{{ $thumbnail.Width }}" height="{{ $thumbnail.Height }}" data-src="{{ $thumbnail.RelPermalink }}" alt="{{ .Title }}" />
+            </figure>
+            <meta itemprop="contentUrl" content="{{ if $publishResources }}{{ $image.RelPermalink }}{{ else }}{{ $full.RelPermalink }}{{ end }}" />
+            {{ with site.Params.Author }}
+              <span itemprop="creator" itemtype="https://schema.org/Person" itemscope>
+                <meta itemprop="name" content="{{ site.Params.Author.name }}" />
+              </span>
+            {{ end }}
+          </a>
+        {{ else }}
+          {{/* Render external image item */}}
+          {{ $width := .Params.width | default 1200 }}
+          {{ $height := .Params.height | default 800 }}
+          <a class="gallery-item" href="{{ .URL }}" data-target="{{ .Name | urlize }}" title="{{ .Title }}" itemscope itemtype="https://schema.org/ImageObject" style="aspect-ratio: {{ $width }} / {{ $height }}">
+            <figure style="background-color: #e0e0e0; aspect-ratio: {{ $width }} / {{ $height }}">
+              <img class="lazyload" width="{{ $width }}" height="{{ $height }}" data-src="{{ .URL }}" alt="{{ .Title }}" style="width: 100%; height: 100%; object-fit: cover;" />
+            </figure>
+            <meta itemprop="contentUrl" content="{{ .URL }}" />
+            {{ with site.Params.Author }}
+              <span itemprop="creator" itemtype="https://schema.org/Person" itemscope>
+                <meta itemprop="name" content="{{ site.Params.Author.name }}" />
+              </span>
+            {{ end }}
+          </a>
+        {{ end }}
+      {{ else if eq .Type "video" }}
+        {{/* Render video item with thumbnail */}}
+        {{ $thumbnailUrl := "" }}
+        {{ $videoUrl := .URL }}
+
+        {{/* Extract YouTube video ID and generate thumbnail */}}
+        {{ if or (in $videoUrl "youtube.com") (in $videoUrl "youtu.be") }}
+          {{ $videoId := "" }}
+          {{ if in $videoUrl "youtube.com/watch?v=" }}
+            {{ $videoId = replaceRE ".*[?&]v=([^&]+).*" "$1" $videoUrl }}
+          {{ else if in $videoUrl "youtu.be/" }}
+            {{ $videoId = replaceRE ".*youtu\\.be/([^?]+).*" "$1" $videoUrl }}
+          {{ end }}
+          {{ if $videoId }}
+            {{ $thumbnailUrl = printf "https://img.youtube.com/vi/%s/maxresdefault.jpg" $videoId }}
+          {{ end }}
+        {{/* Extract Vimeo video ID and generate thumbnail */}}
+        {{ else if in $videoUrl "vimeo.com" }}
+          {{ $videoId := replaceRE ".*vimeo\\.com/(\\d+).*" "$1" $videoUrl }}
+          {{ if $videoId }}
+            {{ $thumbnailUrl = printf "https://vumbnail.com/%s.jpg" $videoId }}
+          {{ end }}
+        {{ end }}
+
+        <a class="gallery-item" href="{{ .URL }}" data-target="{{ .Name | urlize }}" title="{{ .Title }}" style="aspect-ratio: 16 / 9">
+          <figure style="background-color: #000; aspect-ratio: 16 / 9; position: relative; overflow: hidden;">
+            {{ if $thumbnailUrl }}
+              <img class="lazyload" width="1280" height="720" data-src="{{ $thumbnailUrl }}" alt="{{ .Title }}" style="width: 100%; height: 100%; object-fit: cover;" />
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.6); border-radius: 50%; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="white">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </div>
+            {{ else }}
+              <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="white" opacity="0.8">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </div>
+            {{ end }}
+          </figure>
+        </a>
+      {{ end }}
+    {{ end }}
+  </div>
+</section>
