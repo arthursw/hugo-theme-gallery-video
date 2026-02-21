@@ -12,6 +12,10 @@ if (gallery) {
     closeButton: true,
     closeOnOutsideClick: true,
     videosWidth: "960px",
+    iframeAttributes: {
+      allow: "autoplay; encrypted-media; picture-in-picture; web-share; fullscreen",
+      allowFullscreen: true,
+    },
   });
 
   // Handle URL hash for direct image links

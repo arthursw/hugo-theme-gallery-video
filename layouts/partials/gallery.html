@@ -4,7 +4,7 @@
     {{ $videos := slice }}
 
     {{/* Process local image resources */}}
-    {{ range $image := where (.Resources.ByType "image") "Params.hidden" "ne" true }}
+    {{ range $image := where (where (.Resources.ByType "image") "Params.hidden" "ne" true) "Params.cover" "ne" true }}
       {{ $title := "" }}
       {{ $date := "" }}
       {{ with $image.Exif }}
@@ -107,26 +107,36 @@
         {{ $thumbnailUrl := "" }}
         {{ $videoUrl := .URL }}
 
-        {{/* Extract YouTube video ID and generate thumbnail */}}
-        {{ if or (in $videoUrl "youtube.com") (in $videoUrl "youtu.be") }}
-          {{ $videoId := "" }}
-          {{ if in $videoUrl "youtube.com/watch?v=" }}
-            {{ $videoId = replaceRE ".*[?&]v=([^&]+).*" "$1" $videoUrl }}
-          {{ else if in $videoUrl "youtu.be/" }}
-            {{ $videoId = replaceRE ".*youtu\\.be/([^?]+).*" "$1" $videoUrl }}
-          {{ end }}
-          {{ if $videoId }}
-            {{ $thumbnailUrl = printf "https://img.youtube.com/vi/%s/maxresdefault.jpg" $videoId }}
-          {{ end }}
-        {{/* Extract Vimeo video ID and generate thumbnail */}}
-        {{ else if in $videoUrl "vimeo.com" }}
-          {{ $videoId := replaceRE ".*vimeo\\.com/(\\d+).*" "$1" $videoUrl }}
-          {{ if $videoId }}
-            {{ $thumbnailUrl = printf "https://vumbnail.com/%s.jpg" $videoId }}
+        {{/* Convert Facebook URLs to embeddable format */}}
+        {{ if and (in $videoUrl "facebook.com") (not (in $videoUrl "plugins/video.php")) }}
+          {{ $videoUrl = printf "https://www.facebook.com/plugins/video.php?height=314&href=%s&show_text=false&width=560&t=0" ($videoUrl | urlquery) }}
+        {{ end }}
+
+        {{/* Use manual thumbnail from front matter if provided */}}
+        {{ with .Params.thumbnail }}
+          {{ $thumbnailUrl = . }}
+        {{ else }}
+          {{/* Extract YouTube video ID and generate thumbnail */}}
+          {{ if or (in $videoUrl "youtube.com") (in $videoUrl "youtu.be") }}
+            {{ $videoId := "" }}
+            {{ if in $videoUrl "youtube.com/watch?v=" }}
+              {{ $videoId = replaceRE ".*[?&]v=([^&]+).*" "$1" $videoUrl }}
+            {{ else if in $videoUrl "youtu.be/" }}
+              {{ $videoId = replaceRE ".*youtu\\.be/([^?]+).*" "$1" $videoUrl }}
+            {{ end }}
+            {{ if $videoId }}
+              {{ $thumbnailUrl = printf "https://img.youtube.com/vi/%s/hqdefault.jpg" $videoId }}
+            {{ end }}
+          {{/* Extract Vimeo video ID and generate thumbnail */}}
+          {{ else if in $videoUrl "vimeo.com" }}
+            {{ $videoId := replaceRE ".*vimeo\\.com/(\\d+).*" "$1" $videoUrl }}
+            {{ if $videoId }}
+              {{ $thumbnailUrl = printf "https://vumbnail.com/%s.jpg" $videoId }}
+            {{ end }}
           {{ end }}
         {{ end }}
 
-        <a class="gallery-item" href="{{ .URL }}" data-target="{{ .Name | urlize }}" title="{{ .Title }}" style="aspect-ratio: 16 / 9">
+        <a class="gallery-item" href="{{ $videoUrl }}" data-target="{{ .Name | urlize }}" title="{{ .Title }}"{{ with $thumbnailUrl }} data-poster="{{ . }}"{{ end }} style="aspect-ratio: 16 / 9">
           <figure style="background-color: #000; aspect-ratio: 16 / 9; position: relative; overflow: hidden;">
             {{ if $thumbnailUrl }}
               <img class="lazyload" width="1280" height="720" data-src="{{ $thumbnailUrl }}" alt="{{ .Title }}" style="width: 100%; height: 100%; object-fit: cover;" />
