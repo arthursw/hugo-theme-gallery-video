@@ -51,9 +51,10 @@
     {{/* Process videos from front matter */}}
     {{ range .Params.videos }}
       {{ $videos = $videos | append (dict
-        "Name" (.title | default .url)
+        "Name" (.title | default (.url | default "video"))
         "Title" (.title | default "Video")
-        "URL" .url
+        "URL" (.url | default "")
+        "Iframe" (.iframe | default "")
         "Date" (time (.date | default now))
         "Type" "video"
         "Params" .
@@ -107,11 +108,6 @@
         {{ $thumbnailUrl := "" }}
         {{ $videoUrl := .URL }}
 
-        {{/* Convert Facebook URLs to embeddable format */}}
-        {{ if and (in $videoUrl "facebook.com") (not (in $videoUrl "plugins/video.php")) }}
-          {{ $videoUrl = printf "https://www.facebook.com/plugins/video.php?height=314&href=%s&show_text=false&width=560&t=0" ($videoUrl | urlquery) }}
-        {{ end }}
-
         {{/* Use manual thumbnail from front matter if provided */}}
         {{ with .Params.thumbnail }}
           {{ $thumbnailUrl = . }}
@@ -136,7 +132,16 @@
           {{ end }}
         {{ end }}
 
+        {{ if .Iframe }}
+        {{/* Iframe video (e.g. Facebook) — glightbox inline slide */}}
+        {{ $inlineId := printf "glightbox-iframe-%s" (.Name | urlize) }}
+        <div id="{{ $inlineId }}" class="glightbox-iframe-content" style="display: none;">
+          {{ .Iframe | safeHTML }}
+        </div>
+        <a class="gallery-item" href="#{{ $inlineId }}" data-width="90vw" data-height="50.625vw" data-target="{{ .Name | urlize }}" title="{{ .Title }}" style="aspect-ratio: 16 / 9">
+        {{ else }}
         <a class="gallery-item" href="{{ $videoUrl }}" data-target="{{ .Name | urlize }}" title="{{ .Title }}"{{ with $thumbnailUrl }} data-poster="{{ . }}"{{ end }} style="aspect-ratio: 16 / 9">
+        {{ end }}
           <figure style="background-color: #000; aspect-ratio: 16 / 9; position: relative; overflow: hidden;">
             {{ if $thumbnailUrl }}
               <img class="lazyload" width="1280" height="720" data-src="{{ $thumbnailUrl }}" alt="{{ .Title }}" style="width: 100%; height: 100%; object-fit: cover;" />

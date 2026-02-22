@@ -298,8 +298,33 @@ section.gallery {
   cursor: zoom-in;
 }
 
+.gslide-inline:has(.glightbox-iframe-content) {
+  background: transparent;
+
+  .ginlined-content {
+    padding: 0;
+    height: 100%;
+  }
+
+  .glightbox-iframe-content {
+    width: 100%;
+    height: 100%;
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+  }
+}
+
 .hidden {
   display: none;
+}
+
+.menu-with-margin {
+  margin-top: 4rem;
 }
 
 #menu-toggle[aria-expanded="true"] {
