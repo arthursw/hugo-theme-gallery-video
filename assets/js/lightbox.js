@@ -30,8 +30,14 @@ if (gallery) {
     }
   }
 
-  // Update URL hash when navigating
+  // Update URL hash when navigating and stop inline iframes on slide change
   lightbox.on("slide_changed", ({ prev, current }) => {
+    if (prev.slideNode) {
+      const iframe = prev.slideNode.querySelector(".gslide-inline iframe");
+      if (iframe) {
+        iframe.src = "";
+      }
+    }
     const element = gallery.querySelectorAll("a.gallery-item")[current.index];
     if (element && element.dataset["target"]) {
       history.replaceState("", document.title, "#" + element.dataset["target"]);
